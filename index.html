@@ -1,1 +1,336 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Slowed + Reverb + Lofi (Browser)</title>
+<style>
+  :root { --bg:#0f1724; --card:#0b1220; --accent:#FF6C68; --muted:#9aa4b2; color-scheme: dark; }
+  body{font-family:Inter,system-ui,Segoe UI,Arial; margin:0; min-height:100vh; background:linear-gradient(180deg,#071021,#0f1724); color:#e6eef6; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .card{width:880px; max-width:96%; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:18px; box-shadow:0 8px 30px rgba(2,6,23,0.7); border:1px solid rgba(255,255,255,0.03);}
+  h1{margin:0 0 8px 0; font-size:20px;}
+  p.sub{margin:0 0 16px 0; color:var(--muted); font-size:13px;}
+  .row{display:flex; gap:12px; margin-bottom:12px; align-items:center;}
+  .col{flex:1;}
+  label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  input[type="range"]{width:100%;}
+  .controls{display:flex; gap:8px; flex-wrap:wrap;}
+  button{background:var(--accent); color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600;}
+  button.ghost{background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted);}
+  small{color:var(--muted);}
+  .flex{display:flex; gap:12px; align-items:center;}
+  .fileRow{display:flex; gap:12px; align-items:center; margin-bottom:12px;}
+  .status{font-size:13px; color:var(--muted);}
+  .value{min-width:70px; text-align:right; font-weight:600;}
+  footer{margin-top:12px; font-size:12px; color:var(--muted);}
+  .topline{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="topline">
+      <div>
+        <h1>Slowed + Reverb + Lofi — Browser Tool</h1>
+        <p class="sub">Upload করে slider adjust করো → Process → Play / Download</p>
+      </div>
+      <div><small class="status">ডিফল্ট: rate=0.88, reverb decay=1.5s, wet=-5dB</small></div>
+    </div>
+
+    <div class="fileRow">
+      <input id="file" type="file" accept="audio/*">
+      <div class="flex">
+        <button id="processBtn" class="ghost" disabled>Process</button>
+        <button id="playBtn" disabled>Play</button>
+        <a id="downloadA" href="#" style="display:none;"><button>Download WAV</button></a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Slowed (playback rate) <small class="muted"> (0.5 = half speed, 1 = original)</small></label>
+        <input id="rate" type="range" min="0.5" max="1.0" step="0.01" value="0.88">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="rateVal">0.88x</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Reverb decay (seconds)</label>
+        <input id="decay" type="range" min="0.4" max="4.0" step="0.1" value="1.5">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="decayVal">1.5s</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Pre-delay (ms)</label>
+        <input id="predelay" type="range" min="0" max="120" step="1" value="20">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="predelayVal">20ms</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Reverb wet (dB)</label>
+        <input id="wet" type="range" min="-20" max="0" step="0.5" value="-5">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="wetVal">-5 dB</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Low boost (shelf) — gain dB</label>
+        <input id="lowgain" type="range" min="-6" max="8" step="0.5" value="3">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="lowgainVal">+3 dB</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>High cut (lowpass freq Hz)</label>
+        <input id="highcut" type="range" min="2000" max="16000" step="100" value="8000">
+      </div>
+      <div style="width:92px; text-align:right;"><div class="value" id="highcutVal">8000 Hz</div></div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <small>Tip: Slowed কমালে গান গভীর হবে (pitch কমবে)। পিচ অপরিবর্তিত রাখতে চাইলে বলো — সেটার জন্য আলাদা (আর একটু জটিল) অবকাঠামো যোগ করবো।</small>
+    </div>
+
+    <footer>
+      <div>Created for you — Upload royalty-free or your own files to avoid copyright claims.</div>
+    </footer>
+  </div>
+
+<script>
+(async ()=> {
+  const fileInput = document.getElementById('file');
+  const processBtn = document.getElementById('processBtn');
+  const playBtn = document.getElementById('playBtn');
+  const downloadA = document.getElementById('downloadA');
+
+  const rateSlider = document.getElementById('rate');
+  const rateVal = document.getElementById('rateVal');
+  const decaySlider = document.getElementById('decay');
+  const decayVal = document.getElementById('decayVal');
+  const predelaySlider = document.getElementById('predelay');
+  const predelayVal = document.getElementById('predelayVal');
+  const wetSlider = document.getElementById('wet');
+  const wetVal = document.getElementById('wetVal');
+  const lowgainSlider = document.getElementById('lowgain');
+  const lowgainVal = document.getElementById('lowgainVal');
+  const highcutSlider = document.getElementById('highcut');
+  const highcutVal = document.getElementById('highcutVal');
+
+  // Update display values on slider input
+  [rateSlider, decaySlider, predelaySlider, wetSlider, lowgainSlider, highcutSlider].forEach(s=>{
+    s.addEventListener('input', ()=> {
+      rateVal.textContent = parseFloat(rateSlider.value).toFixed(2) + 'x';
+      decayVal.textContent = parseFloat(decaySlider.value).toFixed(1) + 's';
+      predelayVal.textContent = predelaySlider.value + 'ms';
+      wetVal.textContent = wetSlider.value + ' dB';
+      lowgainVal.textContent = (parseFloat(lowgainSlider.value) >=0? '+' : '') + lowgainSlider.value + ' dB';
+      highcutVal.textContent = highcutSlider.value + ' Hz';
+    });
+  });
+
+  let originalBuffer = null;
+  let processedBlob = null;
+  let actx = null;
+  let sourceNode = null;
+
+  fileInput.addEventListener('change', async (e)=>{
+    if(e.target.files.length>0) {
+      processBtn.disabled = false;
+      playBtn.disabled = true;
+      downloadA.style.display = 'none';
+      processedBlob = null;
+      const file = e.target.files[0];
+      actx = new AudioContext();
+      const arrayBuffer = await file.arrayBuffer();
+      originalBuffer = await actx.decodeAudioData(arrayBuffer);
+    }
+  });
+
+  processBtn.addEventListener('click', async ()=>{
+    if(!originalBuffer) return alert('আগে অডিও ফাইল আপলোড করুন।');
+
+    processBtn.disabled = true;
+    playBtn.disabled = true;
+    downloadA.style.display = 'none';
+
+    // Create OfflineAudioContext for processing
+    const length = Math.floor(originalBuffer.length / rateSlider.value);
+    const offlineCtx = new OfflineAudioContext(originalBuffer.numberOfChannels, length, originalBuffer.sampleRate);
+
+    // Create source from original buffer
+    const source = offlineCtx.createBufferSource();
+    source.buffer = originalBuffer;
+    source.playbackRate.value = rateSlider.value;
+
+    // Low shelf filter (boost bass)
+    const lowShelf = offlineCtx.createBiquadFilter();
+    lowShelf.type = "lowshelf";
+    lowShelf.frequency.value = 200;
+    lowShelf.gain.value = lowgainSlider.value;
+
+    // High cut (lowpass) filter
+    const highCut = offlineCtx.createBiquadFilter();
+    highCut.type = "lowpass";
+    highCut.frequency.value = highcutSlider.value;
+
+    // Reverb (Convolver node with impulse response)
+    // We'll create a simple impulse response buffer for reverb effect
+    const createReverbImpulseResponse = (duration, decay, sampleRate, predelayMS) => {
+      const length = duration * sampleRate;
+      const impulse = offlineCtx.createBuffer(2, length, sampleRate);
+      for(let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        const predelaySamples = Math.floor(predelayMS * sampleRate / 1000);
+        for(let i = 0; i < length; i++) {
+          if(i < predelaySamples) {
+            channelData[i] = 0; // silence during predelay
+          } else {
+            // exponential decay noise for reverb tail
+            channelData[i] = (Math.random()*2 -1) * Math.pow(1 - (i - predelaySamples)/length, decay);
+          }
+        }
+      }
+      return impulse;
+    };
+    const reverb = offlineCtx.createConvolver();
+    reverb.buffer = createReverbImpulseResponse(decaySlider.value, decaySlider.value, offlineCtx.sampleRate, predelaySlider.value);
+
+    // Wet gain (reverb volume)
+    const wetGain = offlineCtx.createGain();
+    wetGain.gain.value = Math.pow(10, wetSlider.value/20); // dB to linear gain
+
+    // Dry gain (original signal)
+    const dryGain = offlineCtx.createGain();
+    dryGain.gain.value = 1.0;
+
+    // Connect audio graph:
+    source.connect(lowShelf);
+    lowShelf.connect(highCut);
+
+    highCut.connect(dryGain);
+    highCut.connect(reverb);
+
+    reverb.connect(wetGain);
+
+    // Merge dry + wet
+    const merger = offlineCtx.createGain();
+    dryGain.connect(merger);
+    wetGain.connect(merger);
+
+    merger.connect(offlineCtx.destination);
+
+    source.start(0);
+    const renderedBuffer = await offlineCtx.startRendering();
+
+    // Convert renderedBuffer to WAV Blob for download
+    function encodeWAV(buffer) {
+      const numChannels = buffer.numberOfChannels;
+      const sampleRate = buffer.sampleRate;
+      const format = 1; // PCM
+      const bitsPerSample = 16;
+      const blockAlign = numChannels * bitsPerSample / 8;
+      const byteRate = sampleRate * blockAlign;
+      const dataLength = buffer.length * blockAlign;
+
+      const bufferLength = 44 + dataLength;
+      const arrayBuffer = new ArrayBuffer(bufferLength);
+      const view = new DataView(arrayBuffer);
+
+      function writeString(view, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      // RIFF chunk descriptor
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeString(view, 8, 'WAVE');
+
+      // fmt sub-chunk
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+      view.setUint16(20, format, true); // AudioFormat (1 = PCM)
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, bitsPerSample, true);
+
+      // data sub-chunk
+      writeString(view, 36, 'data');
+      view.setUint32(40, dataLength, true);
+
+      // Write interleaved PCM samples
+      let offset = 44;
+      for(let i=0; i < buffer.length; i++) {
+        for(let ch=0; ch < numChannels; ch++) {
+          let sample = buffer.getChannelData(ch)[i];
+          // Clamp and convert float to 16-bit PCM
+          sample = Math.max(-1, Math.min(1, sample));
+          sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          view.setInt16(offset, sample, true);
+          offset += 2;
+        }
+      }
+
+      return new Blob([arrayBuffer], {type:'audio/wav'});
+    }
+
+    processedBlob = encodeWAV(renderedBuffer);
+
+    processBtn.disabled = false;
+    playBtn.disabled = false;
+    downloadA.style.display = 'inline-block';
+
+    downloadA.href = URL.createObjectURL(processedBlob);
+    downloadA.download = 'slowed_reverb_lofi.wav';
+
+    // For playback
+    if(actx.state === 'closed') actx = new AudioContext();
+
+    if(sourceNode) {
+      sourceNode.disconnect();
+      sourceNode = null;
+    }
+
+    sourceNode = actx.createBufferSource();
+    sourceNode.buffer = renderedBuffer;
+    sourceNode.connect(actx.destination);
+
+    playBtn.textContent = 'Play';
+  });
+
+  playBtn.addEventListener('click', () => {
+    if(!sourceNode) return;
+    if(actx.state === 'suspended') actx.resume();
+
+    if(playBtn.textContent === 'Play') {
+      sourceNode.start(0);
+      playBtn.textContent = 'Stop';
+
+      sourceNode.onended = () => {
+        playBtn.textContent = 'Play';
+        sourceNode.disconnect();
+        sourceNode = null;
+      };
+    } else if(playBtn.textContent === 'Stop') {
+      sourceNode.stop();
+      playBtn.textContent = 'Play';
+      sourceNode.disconnect();
+      sourceNode = null;
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>
 
